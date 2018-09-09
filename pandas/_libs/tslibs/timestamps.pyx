@@ -22,6 +22,7 @@ cimport ccalendar
 from conversion import tz_localize_to_utc, normalize_i8_timestamps
 from conversion cimport (tz_convert_single, _TSObject,
                          convert_to_tsobject, convert_datetime_to_tsobject)
+import enum
 from fields import get_start_end_field, get_date_name_field
 from nattype import NaT
 from nattype cimport NPY_NAT
@@ -57,50 +58,42 @@ cdef inline object create_timestamp_from_ts(int64_t value,
     return ts_base
 
 
-def round_ns(values, rounder, freq):
+class RoundTo(enum.Enum):
+    MINUS_INFTY = enum.auto()
+    PLUS_INFTY = enum.auto()
+    NEAREST_HALF_EVEN = enum.auto()
+    NEAREST_HALF_PLUS_INFTY = enum.auto()
+    NEAREST_HALF_MINUS_INFTY = enum.auto()
+
+
+def round_nsint64(values, mode, freq):
     """
-    Applies rounding function at given frequency
+    Applies rounding mode at given frequency
 
     Parameters
     ----------
     values : :obj:`ndarray`
-    rounder : function, eg. 'ceil', 'floor', 'round'
+    mode : instance of `RoundTo` enumeration
     freq : str, obj
 
     Returns
     -------
     :obj:`ndarray`
     """
+
+    if not isinstance(mode, RoundTo):
+        raise ValueError('mode should be a RoundTo member')
+
     unit = to_offset(freq).nanos
 
-    # GH21262 If the Timestamp is multiple of the freq str
-    # don't apply any rounding
-    mask = values % unit == 0
-    if mask.all():
-        return values
-    r = values.copy()
+    if mode is RoundTo.MINUS_INFTY:
+        return values - (values % unit)
+    elif mode is RoundTo.PLUS_INFTY:
+        return values + (-values % unit)
+    elif mode is RoundTo.NEAREST_HALF_MINUS_INFTY:
+        return round_nsint64(values - unit//2, RoundTo.PLUS_INFTY, freq)
 
-    if unit < 1000:
-        # for nano rounding, work with the last 6 digits separately
-        # due to float precision
-        buff = 1000000
-        r[~mask] = (buff * (values[~mask] // buff) +
-                    unit * (rounder((values[~mask] % buff) *
-                            (1 / float(unit)))).astype('i8'))
-    else:
-        if unit % 1000 != 0:
-            msg = 'Precision will be lost using frequency: {}'
-            warnings.warn(msg.format(freq))
-        # GH19206
-        # to deal with round-off when unit is large
-        if unit >= 1e9:
-            divisor = 10 ** int(np.log10(unit / 1e7))
-        else:
-            divisor = 10
-        r[~mask] = (unit * rounder((values[~mask] *
-                    (divisor / float(unit))) / divisor)
-                    .astype('i8'))
-    return r
+    raise NotImplementedError(mode)
 
 
 # This is PITA. Because we inherit from datetime, which has very specific
@@ -656,7 +649,7 @@ class Timestamp(_Timestamp):
 
         return create_timestamp_from_ts(ts.value, ts.dts, ts.tzinfo, freq)
 
-    def _round(self, freq, rounder):
+    def _round(self, freq, mode):
         if self.tz is not None:
             value = self.tz_localize(None).value
         else:
@@ -665,7 +658,7 @@ class Timestamp(_Timestamp):
         value = np.array([value], dtype=np.int64)
 
         # Will only ever contain 1 element for timestamp
-        r = round_ns(value, rounder, freq)[0]
+        r = round_nsint64(value, mode, freq)[0]
         result = Timestamp(r, unit='ns')
         if self.tz is not None:
             result = result.tz_localize(self.tz)
@@ -687,7 +680,7 @@ class Timestamp(_Timestamp):
         ------
         ValueError if the freq cannot be converted
         """
-        return self._round(freq, np.round)
+        return self._round(freq, RoundTo.NEAREST_HALF_MINUS_INFTY)
 
     def floor(self, freq):
         """
@@ -697,7 +690,7 @@ class Timestamp(_Timestamp):
         ----------
         freq : a freq string indicating the flooring resolution
         """
-        return self._round(freq, np.floor)
+        return self._round(freq, RoundTo.MINUS_INFTY)
 
     def ceil(self, freq):
         """
@@ -707,7 +700,7 @@ class Timestamp(_Timestamp):
         ----------
         freq : a freq string indicating the ceiling resolution
         """
-        return self._round(freq, np.ceil)
+        return self._round(freq, RoundTo.PLUS_INFTY)
 
     @property
     def tz(self):
