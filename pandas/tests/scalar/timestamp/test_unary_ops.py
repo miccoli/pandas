@@ -69,9 +69,9 @@ class TestTimestampUnaryOps(object):
         expected = Timestamp('2016-10-17 12:00:00.001501030')
         assert result == expected
 
-    def test_round_nonstandard_freq(self):
-        with tm.assert_produces_warning():
-            Timestamp('2016-10-17 12:00:00.001501031').round('1010ns')
+        result = Timestamp('2016-10-17 12:00:00.001501031').round('1010ns')
+        expected = Timestamp('2016-10-17 12:00:00.001501340')
+        assert result == expected
 
     def test_round_invalid_arg(self):
         stamp = Timestamp('2000-01-05 05:09:15.13')
