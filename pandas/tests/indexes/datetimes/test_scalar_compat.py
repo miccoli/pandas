@@ -124,7 +124,7 @@ class TestDatetimeIndexOps(object):
         expected = DatetimeIndex(['2016-10-17 12:00:00.001501030'])
         tm.assert_index_equal(result, expected)
 
-        with tm.assert_produces_warning():
+        with tm.assert_produces_warning(False):
             ts = '2016-10-17 12:00:00.001501031'
             DatetimeIndex([ts]).round('1010ns')
 
