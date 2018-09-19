@@ -67,6 +67,18 @@ class RoundTo(enum.Enum):
     NEAREST_HALF_MINUS_INFTY = 4
 
 
+cdef inline _floor_int64(v, u):
+    return v - np.remainder(v, u)
+
+cdef inline _ceil_int64(v, u):
+    return v + np.remainder(-v, u)
+
+cdef inline _rounddown_int64(v, u):
+    return _ceil_int64(v - u//2, u)
+
+cdef inline _roundup_int64(v, u):
+    return _floor_int64(v + u//2, u)
+
 def round_nsint64(values, mode: RoundTo, freq):
     """
     Applies rounding mode at given frequency
@@ -88,17 +100,17 @@ def round_nsint64(values, mode: RoundTo, freq):
     unit = to_offset(freq).nanos
 
     if mode is RoundTo.MINUS_INFTY:
-        return values - (values % unit)
+        return _floor_int64(values, unit)
     elif mode is RoundTo.PLUS_INFTY:
-        return values + (-values % unit)
+        return _ceil_int64(values, unit)
     elif mode is RoundTo.NEAREST_HALF_MINUS_INFTY:
-        return round_nsint64(values - unit//2, RoundTo.PLUS_INFTY, freq)
+        return _rounddown_int64(values, unit)
     elif mode is RoundTo.NEAREST_HALF_PLUS_INFTY:
-        return round_nsint64(values + unit//2, RoundTo.MINUS_INFTY, freq)
+        return _roundup_int64(values, unit)
     elif mode is RoundTo.NEAREST_HALF_EVEN:
-        # for odd unit there is n need of a tie break
+        # for odd unit there is no need of a tie break
         if unit % 2:
-            return round_nsint64(values, RoundTo.NEAREST_HALF_MINUS_INFTY, freq)
+            return _rounddown_int64(values, unit)
         d, r = np.divmod(values, unit)
         mask = np.logical_or(
             r > (unit // 2),
