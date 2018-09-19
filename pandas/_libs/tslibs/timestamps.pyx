@@ -88,26 +88,25 @@ def round_nsint64(values, mode: RoundTo, freq):
     unit = to_offset(freq).nanos
 
     if mode is RoundTo.MINUS_INFTY:
-        return values - (values % unit)
+        return values - values % unit
     elif mode is RoundTo.PLUS_INFTY:
         return values + (-values % unit)
-    elif mode is RoundTo.NEAREST_HALF_MINUS_INFTY:
-        return round_nsint64(values - unit//2, RoundTo.PLUS_INFTY, freq)
-    elif mode is RoundTo.NEAREST_HALF_PLUS_INFTY:
-        return round_nsint64(values + unit//2, RoundTo.MINUS_INFTY, freq)
-    elif mode is RoundTo.NEAREST_HALF_EVEN:
-        # for odd unit there is n need of a tie break
-        if unit % 2:
-            return round_nsint64(values, RoundTo.NEAREST_HALF_MINUS_INFTY, freq)
+    else:
+        # rounding
         d, r = np.divmod(values, unit)
-        mask = np.logical_or(
-            r > (unit // 2),
-            np.logical_and(r == (unit // 2), d % 2)
-        )
+        if unit % 2 or mode is RoundTo.NEAREST_HALF_MINUS_INFTY:
+            mask = r > (unit // 2)
+        elif mode is RoundTo.NEAREST_HALF_PLUS_INFTY:
+            assert unit % 2 == 0
+            mask = r >= (unit // 2)
+        elif mode is RoundTo.NEAREST_HALF_EVEN:
+            assert unit % 2 == 0
+            mask = np.logical_or(
+                r > (unit // 2),
+                np.logical_and(r == (unit // 2), d % 2)
+            )
         d[mask] += 1
         return d * unit
-
-    raise NotImplementedError(mode)
 
 
 # This is PITA. Because we inherit from datetime, which has very specific
