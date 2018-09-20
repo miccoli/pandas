@@ -39,6 +39,7 @@ from timezones cimport (
 # Constants
 _zero_time = datetime_time(0, 0)
 _no_input = object()
+_safe_unit = 2**12 - 1
 
 # ----------------------------------------------------------------------
 
@@ -67,17 +68,23 @@ class RoundTo(enum.Enum):
     NEAREST_HALF_MINUS_INFTY = 4
 
 
-cdef inline _floor_int64(v, u):
-    return v - np.remainder(v, u)
+cdef inline _floor(v, u):
+    if u & _safe_unit == 0:
+        return np.floor(v / float(u)) * u
+    else:
+        return v - np.remainder(v, u)
 
-cdef inline _ceil_int64(v, u):
-    return v + np.remainder(-v, u)
+cdef inline _ceil(v, u):
+    if u & _safe_unit == 0:
+        return np.ceil(v / float(u)) * u
+    else:
+        return v + np.remainder(-v, u)
 
 cdef inline _rounddown_int64(v, u):
-    return _ceil_int64(v - u//2, u)
+    return _ceil(v - u//2, u)
 
 cdef inline _roundup_int64(v, u):
-    return _floor_int64(v + u//2, u)
+    return _floor(v + u//2, u)
 
 def round_nsint64(values, mode: RoundTo, freq):
     """
@@ -100,14 +107,16 @@ def round_nsint64(values, mode: RoundTo, freq):
     unit = to_offset(freq).nanos
 
     if mode is RoundTo.MINUS_INFTY:
-        return _floor_int64(values, unit)
+        return _floor(values, unit)
     elif mode is RoundTo.PLUS_INFTY:
-        return _ceil_int64(values, unit)
+        return _ceil(values, unit)
     elif mode is RoundTo.NEAREST_HALF_MINUS_INFTY:
         return _rounddown_int64(values, unit)
     elif mode is RoundTo.NEAREST_HALF_PLUS_INFTY:
         return _roundup_int64(values, unit)
     elif mode is RoundTo.NEAREST_HALF_EVEN:
+        if unit & _safe_unit == 0:
+            return np.round(values / float(unit)) * unit
         # for odd unit there is no need of a tie break
         if unit % 2:
             return _rounddown_int64(values, unit)
