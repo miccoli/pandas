@@ -93,20 +93,22 @@ def round_nsint64(values, mode: RoundTo, freq):
         return values + (-values % unit)
     else:
         # rounding
-        d, r = np.divmod(values, unit)
         if unit % 2 or mode is RoundTo.NEAREST_HALF_MINUS_INFTY:
+            r = values % unit
             mask = r > (unit // 2)
         elif mode is RoundTo.NEAREST_HALF_PLUS_INFTY:
             assert unit % 2 == 0
+            r = values % unit
             mask = r >= (unit // 2)
         elif mode is RoundTo.NEAREST_HALF_EVEN:
             assert unit % 2 == 0
+            d, r = np.divmod(values, unit)
             mask = np.logical_or(
                 r > (unit // 2),
                 np.logical_and(r == (unit // 2), d % 2)
             )
-        d[mask] += 1
-        return d * unit
+        r[mask] -= unit
+        return values - r
 
 
 # This is PITA. Because we inherit from datetime, which has very specific
