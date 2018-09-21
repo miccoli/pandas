@@ -79,6 +79,7 @@ cdef inline _rounddown_int64(v, u):
 cdef inline _roundup_int64(v, u):
     return _floor_int64(v + u//2, u)
 
+
 def round_nsint64(values, mode: RoundTo, freq):
     """
     Applies rounding mode at given frequency
