@@ -67,6 +67,17 @@ class RoundTo(enum.Enum):
     NEAREST_HALF_MINUS_INFTY = 4
 
 
+cdef inline _npdivmod(x1, x2):
+    """implement divmod for numpy < 1.13"""
+    return np.floor_divide(x1, x2), np.remainder(x1, x2)
+
+
+try:
+    from numpy import divmod as npdivmod
+except ImportError:
+    npdivmod = _npdivmod
+
+
 cdef inline _floor_int64(v, u):
     return v - np.remainder(v, u)
 
@@ -112,7 +123,7 @@ def round_nsint64(values, mode: RoundTo, freq):
         # for odd unit there is no need of a tie break
         if unit % 2:
             return _rounddown_int64(values, unit)
-        d, r = np.divmod(values, unit)
+        d, r = npdivmod(values, unit)
         mask = np.logical_or(
             r > (unit // 2),
             np.logical_and(r == (unit // 2), d % 2)
