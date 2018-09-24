@@ -635,7 +635,7 @@ Datetimelike
 - Bug in :meth:`DataFrame.eq` comparison against ``NaT`` incorrectly returning ``True`` or ``NaN`` (:issue:`15697`, :issue:`22163`)
 - Bug in :class:`DatetimeIndex` subtraction that incorrectly failed to raise ``OverflowError`` (:issue:`22492`, :issue:`22508`)
 - Bug in :class:`DatetimeIndex` incorrectly allowing indexing with ``Timedelta`` object (:issue:`20464`)
--
+- Bug in rounding methods of :class:`DatetimeIndex` (:meth:`~DatetimeIndex.round`, :meth:`~DatetimeIndex.ceil`, :meth:`~DatetimeIndex.floor`) and :class:`Timestamp` (:meth:`~Timestamp.round`, :meth:`~Timestamp.ceil`, :meth:`~Timestamp.floor`) could give raise to loss of precision (:issue:`22591`)
 
 Timedelta
 ^^^^^^^^^
